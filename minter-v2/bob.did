@@ -48,4 +48,4 @@ service : () -> {
   spawn_miner : (nat64) -> (Result_1);
   submit_burned_cycles : (nat64) -> (Result);
   upgrade_miner : (principal) -> (Result);
-};
+}
