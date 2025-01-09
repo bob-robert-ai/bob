@@ -46,4 +46,6 @@ service : () -> {
   spawn_miner : (nat64) -> (Result_1);
   submit_burned_cycles : (nat64) -> (Result);
   upgrade_miner : (principal) -> (Result);
+  icrc10_supported_standards : () -> (vec record { name : text; url : text }) query;
+  icrc28_trusted_origins : () -> (record { trusted_origins: vec text });
 }

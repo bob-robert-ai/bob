@@ -21,4 +21,6 @@ service : (principal) -> {
   get_statistics_v2 : () -> (StatsV2) query;
   push_challenge : (blob, nat64) -> ();
   update_miner_settings : (MinerSettings) -> ();
+  icrc10_supported_standards : () -> (vec record { name : text; url : text }) query;
+  icrc28_trusted_origins : () -> (record { trusted_origins: vec text });
 }

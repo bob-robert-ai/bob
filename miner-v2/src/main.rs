@@ -73,6 +73,41 @@ fn get_state() -> State {
     read_state(|s| s.clone())
 }
 
+#[derive(CandidType)]
+struct Icrc28TrustedOriginsResponse {
+    pub trusted_origins: Vec<String>
+}
+
+#[update]
+fn icrc28_trusted_origins() -> Icrc28TrustedOriginsResponse {
+    let trusted_origins = vec![
+        String::from("https://bob.fun"),
+        String::from("https://ywiuf-vaaaa-aaaal-qjumq-cai.icp0.io")
+    ];
+
+    return Icrc28TrustedOriginsResponse { trusted_origins }
+}
+
+#[derive(CandidType)]
+struct Icrc10SupportedStandard {
+    pub url: String,
+    pub name: String,
+}
+
+#[query]
+fn icrc10_supported_standards() -> Vec<Icrc10SupportedStandard> {
+    vec![
+        Icrc10SupportedStandard {
+            url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-10/ICRC-10.md".to_string(),
+            name: "ICRC-10".to_string(),
+        },
+        Icrc10SupportedStandard {
+            url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_28_trusted_origins.md".to_string(),
+            name: "ICRC-28".to_string(),
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
