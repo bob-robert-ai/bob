@@ -1,5 +1,5 @@
 # Use Ubuntu as the base image
-FROM --platform=$TARGETPLATFORM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:22.04
 
 # Prevent timezone prompt during package installation
 ENV DEBIAN_FRONTEND=noninteractive
