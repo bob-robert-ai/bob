@@ -89,6 +89,30 @@ fn get_latest_blocks() -> Vec<Block> {
     result
 }
 
+#[query]
+fn get_block_by_index(index: u64) -> Option<Block> {
+    get_block(index)
+}
+
+#[query]
+fn get_blocks(start: u64, length: u64) -> Vec<Block> {
+    if ic_cdk::api::in_replicated_execution() {
+        // If we're in replicated execution, panic
+        panic!("Cannot call this function in replicated execution");
+    }
+    const MAX_BLOCKS_PER_RESPONSE: u64 = 1000;
+    let length = length.min(MAX_BLOCKS_PER_RESPONSE);
+    let mut result: Vec<Block> = vec![];
+    for i in start..start + length {
+        if let Some(block) = get_block(i) {
+            result.push(block);
+        } else {
+            break;
+        }
+    }
+    result
+}
+
 #[derive(CandidType)]
 struct CurrentBlockStatus {
     active_miners: usize,

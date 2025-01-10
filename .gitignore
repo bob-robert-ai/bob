@@ -4,3 +4,4 @@ target/
 integration-tests/pocket-ic
 integration-tests/wasms/
 **/*.swp
+**/.DS_Store
