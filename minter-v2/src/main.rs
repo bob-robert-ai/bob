@@ -13,7 +13,6 @@ use bob_minter_v2::{
     Stats, BLOCK_HALVING, DAY_NANOS, SEC_NANOS,
 };
 use candid::{CandidType, Encode, Principal};
-use ic0::trap;
 use ic_cdk::{init, post_upgrade, query, update};
 use icp_ledger::{AccountIdentifier, Operation};
 use std::time::Duration;
