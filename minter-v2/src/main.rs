@@ -13,6 +13,7 @@ use bob_minter_v2::{
     Stats, BLOCK_HALVING, DAY_NANOS, SEC_NANOS,
 };
 use candid::{CandidType, Encode, Principal};
+use ic0::trap;
 use ic_cdk::{init, post_upgrade, query, update};
 use icp_ledger::{AccountIdentifier, Operation};
 use std::time::Duration;
@@ -96,6 +97,10 @@ fn get_block_by_index(index: u64) -> Option<Block> {
 
 #[query]
 fn get_blocks(start: u64, length: u64) -> Vec<Block> {
+    if ic_cdk::api::in_replicated_execution() {
+        // If we're in replicated execution, panic
+        panic!("Cannot call this function in replicated execution");
+    }
     const MAX_BLOCKS_PER_RESPONSE: u64 = 1000;
     let length = length.min(MAX_BLOCKS_PER_RESPONSE);
     let mut result: Vec<Block> = vec![];
