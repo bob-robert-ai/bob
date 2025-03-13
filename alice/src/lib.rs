@@ -155,12 +155,12 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
     };
 
     if token == Token::Icp {
-        return Err(format!("Cannot buy nor sell ICP",));
+        return Err("Cannot buy nor sell ICP".to_string());
     }
 
     let amount_to_trade = match action.as_str() {
         "buy" => read_state(|s| s.amount_to_buy(token)),
-        "sell" => read_state(|s| s.balances.get(&token).unwrap_or(&0).clone()) / 10,
+        "sell" => read_state(|s| *s.balances.get(&token).unwrap_or(&0)) / 10,
         _ => return Err("Unknown action".to_string()),
     };
 
@@ -341,7 +341,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
             .await
             {
                 Ok(_) => Ok(()),
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
         Action::Swap {
@@ -384,7 +384,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
                     });
                     Ok(())
                 }
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
         Action::Withdraw {
@@ -407,7 +407,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
                     schedule_now(TaskType::RefreshContext);
                     Ok(())
                 }
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
     }
@@ -435,13 +435,10 @@ pub async fn refresh_prices() {
 
     let futures = tokens.into_iter().map(|token| async move {
         let pool = token.pool_id();
-        match get_pool(pool).await {
-            Ok(price) => {
-                mutate_state(|s| {
-                    s.insert_price(token, price);
-                });
-            }
-            Err(_) => {}
+        if let Ok(price) = get_pool(pool).await {
+            mutate_state(|s| {
+                s.insert_price(token, price);
+            });
         }
     });
 
@@ -515,7 +512,7 @@ fn get_grok_prompt(user_prompt: String, seed: i32) -> Prompt {
     }
 }
 
-fn get_deepseek_prompt(user_prompt: String, seed: i32) -> Prompt {
+fn _get_deepseek_prompt(user_prompt: String, seed: i32) -> Prompt {
     Prompt {
         messages: vec![
             Message {
@@ -577,14 +574,14 @@ pub async fn fetch_quotes() {
             let result = quote(
                 token.pool_id(),
                 SwapArgs {
-                    amount_in: format!("100_000_000"),
+                    amount_in: "100_000_000".to_string(),
                     zero_for_one: TradeAction::Sell {
                         token,
                         amount: 0,
                         ts: 0,
                     }
                     .get_zero_for_one(),
-                    amount_out_minimum: format!(""),
+                    amount_out_minimum: String::new(),
                 },
             )
             .await;

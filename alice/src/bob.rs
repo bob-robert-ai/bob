@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 pub async fn refresh_miner_settings() -> Result<(), String> {
     if crate::memory::get_bob_miner().is_none() {
-        return Err(format!("bob miner not spawned"));
+        return Err("bob miner not spawned".to_string());
     }
 
     let statistics = get_statistics_v2().await?;
@@ -25,7 +25,7 @@ pub struct MinerSettings {
 
 async fn update_miner_settings(max_cycles_per_round: Nat) -> Result<(), String> {
     if crate::memory::get_bob_miner().is_none() {
-        return Err(format!("bob miner not spawned"));
+        return Err("bob miner not spawned".to_string());
     }
     let result: Result<(), (i32, String)> = ic_cdk::api::call::call(
         crate::memory::get_bob_miner().unwrap(),
