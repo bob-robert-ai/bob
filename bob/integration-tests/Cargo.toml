@@ -13,5 +13,5 @@ ic-ledger-core = { workspace = true }
 ic-ledger-types = { workspace = true }
 icp-ledger = { workspace = true }
 icrc-ledger-types = { workspace = true }
-bob-minter-v2 = { path = "../minter-v2" }
+bob_minter_v2 = { path = "../minter-v2" }
 pocket-ic = { workspace = true }

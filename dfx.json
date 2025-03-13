@@ -2,15 +2,22 @@
   "dfx": "0.24.2",
   "canisters": {
     "miner": {
-      "candid": "miner-v2/miner.did",
+      "candid": "bob/miner-v2/miner.did",
       "package": "bob_miner_v2",
       "shrink": true,
       "gzip": true,
       "type": "rust"
     },
     "bob-v2": {
-      "candid": "minter-v2/bob.did",
-      "package": "bob-minter-v2",
+      "candid": "bob/minter-v2/bob.did",
+      "package": "bob_minter_v2",
+      "shrink": true,
+      "gzip": true,
+      "type": "rust"
+    },
+    "alice": {
+      "candid": "alice/alice.did",
+      "package": "alice",
       "shrink": true,
       "gzip": true,
       "type": "rust"
