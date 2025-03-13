@@ -185,7 +185,7 @@ fn deploy_bob(pic: &PocketIc) {
         .unwrap();
     assert_eq!(bob_canisterid, BOB_CANISTER_ID);
     pic.add_cycles(bob_canisterid, 100_000_000_000_000);
-    let bob_canisterwasm = get_canister_wasm("bob-minter-v2").to_vec();
+    let bob_canisterwasm = get_canister_wasm("bob_minter_v2").to_vec();
     pic.install_canister(
         bob_canisterid,
         bob_canisterwasm,
