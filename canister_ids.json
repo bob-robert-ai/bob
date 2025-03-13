@@ -4,5 +4,8 @@
   },
   "miner": {
     "ic": "mr6ee-jaaaa-aaaas-aaciq-cai"
+  },
+  "alice": {
+    "ic": "wnskr-liaaa-aaaam-aecdq-cai"
   }
 }

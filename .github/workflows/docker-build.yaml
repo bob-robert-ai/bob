@@ -17,4 +17,5 @@ jobs:
         run: |
           docker build -t rust-dev .
           docker run -v $(pwd):/app -t rust-dev bash /app/build.sh
-          sha256sum target/wasm32-unknown-unknown/release/*.wasm.gz
+          sha256sum target/wasm32-unknown-unknown/release/bob_minter_v2.wasm.gz
+          sha256sum target/wasm32-unknown-unknown/release/bob_miner_v2.wasm

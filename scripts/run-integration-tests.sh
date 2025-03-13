@@ -28,10 +28,10 @@ if [ $BUILD_WASMS == "true" ]; then
     ./build.sh
 fi
 
-mkdir -p integration-tests/wasms
-cp target/wasm32-unknown-unknown/release/*.wasm.gz integration-tests/wasms
+mkdir -p bob/integration-tests/wasms
+cp target/wasm32-unknown-unknown/release/*.wasm.gz bob/integration-tests/wasms
 
-cd integration-tests
+cd bob/integration-tests
 if [[ ! -f pocket-ic || "$(./pocket-ic --version)" != "pocket-ic-server $POCKET_IC_VERSION" ]]
 then
   echo "PocketIC download starting"
@@ -42,7 +42,7 @@ then
   chmod +x pocket-ic
   echo "PocketIC download completed"
 fi
-cd ..
+cd ../..
 
 if [ $DOWNLOAD_NNS_CANISTERS == "true" ]; then
     ./scripts/download-nns-canister-wasm.sh icp_ledger ledger-canister

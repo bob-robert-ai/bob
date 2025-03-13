@@ -38,6 +38,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "alice"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "candid_parser",
+ "ciborium",
+ "futures",
+ "ic-canister-log 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-canisters-http-types",
+ "ic-cdk 0.17.1",
+ "ic-ledger-types",
+ "ic-stable-structures",
+ "ic0 0.23.0",
+ "icrc-ledger-client-cdk",
+ "icrc-ledger-types",
+ "scopeguard",
+ "serde",
+ "serde_json",
+ "strum",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -228,7 +250,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "bob-minter-v2"
+name = "bob_miner_v2"
+version = "0.0.0"
+dependencies = [
+ "candid",
+ "candid_parser",
+ "ic-cdk 0.17.1",
+ "ic-cdk-timers 0.11.0",
+ "serde",
+]
+
+[[package]]
+name = "bob_minter_v2"
 version = "0.0.0"
 dependencies = [
  "candid",
@@ -251,17 +284,6 @@ dependencies = [
  "scopeguard",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "bob_miner_v2"
-version = "0.0.0"
-dependencies = [
- "candid",
- "candid_parser",
- "ic-cdk 0.17.1",
- "ic-cdk-timers 0.11.0",
- "serde",
 ]
 
 [[package]]
@@ -1330,6 +1352,15 @@ dependencies = [
 [[package]]
 name = "ic-canister-log"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb82c4f617ecff6e452fe65af0489626ec7330ffe3eedd9ea14e6178eea48d1a"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "ic-canister-log"
+version = "0.2.0"
 source = "git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90#bc83b42ae2b8c8246e6387731910842a12ebee90"
 dependencies = [
  "serde",
@@ -1603,7 +1634,7 @@ dependencies = [
  "ciborium",
  "dfn_core",
  "ic-base-types",
- "ic-canister-log",
+ "ic-canister-log 0.2.0 (git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90)",
  "ic-canisters-http-types",
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.9.0",
@@ -1652,7 +1683,7 @@ dependencies = [
  "candid",
  "ciborium",
  "ic-base-types",
- "ic-canister-log",
+ "ic-canister-log 0.2.0 (git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90)",
  "ic-canister-profiler",
  "ic-canisters-http-types",
  "ic-cdk 0.16.0",
@@ -1682,7 +1713,7 @@ dependencies = [
  "ciborium",
  "hex",
  "ic-base-types",
- "ic-canister-log",
+ "ic-canister-log 0.2.0 (git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90)",
  "ic-canisters-http-types",
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.9.0",
@@ -1725,7 +1756,7 @@ dependencies = [
  "async-trait",
  "candid",
  "ic-base-types",
- "ic-canister-log",
+ "ic-canister-log 0.2.0 (git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90)",
  "ic-ledger-core",
  "ic-ledger-hash-of",
  "ic-limits",
@@ -1817,7 +1848,7 @@ dependencies = [
  "bytes",
  "dfn_core",
  "ic-base-types",
- "ic-canister-log",
+ "ic-canister-log 0.2.0 (git+https://github.com/dfinity/ic/?rev=bc83b42ae2b8c8246e6387731910842a12ebee90)",
  "ic-canisters-http-types",
  "ic-crypto-sha2",
  "ic-ledger-core",
@@ -2331,7 +2362,7 @@ dependencies = [
 name = "integration-tests"
 version = "0.0.1"
 dependencies = [
- "bob-minter-v2",
+ "bob_minter_v2",
  "candid",
  "candid_parser",
  "hex",
@@ -3033,7 +3064,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.89",
@@ -3117,7 +3148,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3530,9 +3561,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.215"
+version = "1.0.217"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6513c1ad0b11a9376da888e3e0baa0077f1aed55c17f50e7b2397136129fb88f"
+checksum = "02fc4265df13d6fa1d00ecff087228cc0a2b5f3c0e87e258d8b94a156e984c70"
 dependencies = [
  "serde_derive",
 ]
@@ -3558,9 +3589,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.215"
+version = "1.0.217"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1e866f866923f252f05c889987993144fb74e722403468a4ebd70c3cd756c0"
+checksum = "5a9bf7cf98d04a2b28aead066b7496853d4779c9cc183c440dbac457641e19a0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3580,9 +3611,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.133"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
+checksum = "930cfb6e6abf99298aaad7d29abbef7a9999a9a8806a40088f55f0dcec03146b"
 dependencies = [
  "itoa",
  "memchr",
@@ -3779,7 +3810,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4498,7 +4529,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

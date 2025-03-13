@@ -1,9 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-  "miner-v2",
-  "minter-v2",
-  "integration-tests",
+  "bob/miner-v2",
+  "bob/minter-v2",
+  "bob/integration-tests",
+  "alice"
 ]
 
 [workspace.package]
@@ -18,11 +19,14 @@ candid_parser = "0.2.0-beta.4"
 ciborium = "0.2.2"
 cycles-minting-canister = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 hex = "0.4"
+futures = "0.3.31"
 ic-base-types = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
+ic-canister-log = "0.2.0"
 ic-cdk = "0.17.1"
 ic-cdk-timers = "0.11.0"
 ic-stable-structures = "0.6.5"
 ic0 = "0.23.0"
+ic-canisters-http-types = { git = "https://github.com/dfinity/ic.git", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-management-canister-types = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 icrc-ledger-client-cdk = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-types = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
@@ -38,3 +42,4 @@ rand_chacha = "0.3.1"
 scopeguard = "1.2.0"
 serde_json = "1.0.120"
 serde = "1.0.209"
+strum = "0.26.3"

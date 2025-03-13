@@ -6,7 +6,7 @@ fn main() {
     let archive_path = match env::var_os("MINER_WASM_PATH") {
         Some(wasm_path) => PathBuf::from(wasm_path),
         None => cargo_manifest_dir
-            .join("../target/wasm32-unknown-unknown/release/bob_miner_v2.wasm")
+            .join("../../target/wasm32-unknown-unknown/release/bob_miner_v2.wasm")
             .canonicalize()
             .expect("failed to canonicalize a path"),
     };

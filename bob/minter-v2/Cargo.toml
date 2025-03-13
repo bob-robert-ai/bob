@@ -1,12 +1,12 @@
 [package]
-name = "bob-minter-v2"
+name = "bob_minter_v2"
 edition = "2021"
 
 [lib]
 path = "src/lib.rs"
 
 [[bin]]
-name = "bob-minter-v2"
+name = "bob_minter_v2"
 path = "src/main.rs"
 
 [dependencies]
