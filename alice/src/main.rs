@@ -1,11 +1,16 @@
 use alice::state::{read_state, replace_state, State};
 use alice::tasks::{schedule_after, schedule_now, TaskType};
-use alice::{Asset, Token, TradeAction, TAKE_DECISION_DELAY};
-use candid::Principal;
-use ic_canisters_http_types::{HttpRequest, HttpResponse, HttpResponseBuilder};
-use ic_cdk::api::management_canister::http_request::{
-    HttpResponse as HttpResponseCleanUp, TransformArgs,
+use alice::{
+    Asset, CreateTokenArg, DisplayAmount, LaunchTokenArg, ProposalArg, Token, TradeAction,
+    TRIGGER_TOKEN_CREATION_FUNCTION_ID,
 };
+use candid::{Encode, Principal};
+use ic_canisters_http_types::{HttpRequest, HttpResponse, HttpResponseBuilder};
+use ic_sns_governance::pb::v1::{
+    self, proposal::Action, ExecuteGenericNervousSystemFunction, GovernanceError, ManageNeuron,
+    ManageNeuronResponse, Proposal, ProposalId,
+};
+
 use ic_cdk::{init, post_upgrade, query, update};
 use std::collections::BTreeMap;
 use strum::IntoEnumIterator;
@@ -25,11 +30,12 @@ fn post_upgrade() {
 }
 
 fn setup_timer() {
-    schedule_after(TAKE_DECISION_DELAY, TaskType::RefreshContext);
+    schedule_after(std::time::Duration::from_secs(300), TaskType::TakeDecision);
     schedule_now(TaskType::ProcessLogic);
     schedule_now(TaskType::RefreshContext);
     schedule_now(TaskType::FetchQuotes);
     schedule_now(TaskType::RefreshMinerBurnRate);
+    schedule_now(TaskType::TryVoteOnProposal);
 }
 
 #[export_name = "canister_global_timer"]
@@ -49,18 +55,37 @@ fn get_all_prices() -> String {
 
 #[query]
 fn last_trade_action() -> Vec<TradeAction> {
-    const LENGTH: u64 = 0;
+    const LENGTH: u64 = 10;
     alice::memory::last_trade_action(LENGTH)
 }
 
 #[query]
 fn get_real_time_context() -> String {
-    alice::build_user_prompt()
-}
+    format!(
+        "Your portfolio valued in ICP terms is:
+        {}
+        You can *only* answer with one of the following: BUY ALICE, BUY BOB, SELL BOB, HODL.
+        What should you do next?
+        --------------
+        {}
+        ",
+        read_state(|s| {
+            let mut result = String::new();
 
-#[query(hidden = true)]
-fn get_last_quote_value(token: Token) -> Option<u64> {
-    read_state(|s| s.maybe_get_last_quote(token).map(|q| q.value))
+            for token in Token::iter() {
+                if let Some(value) = s.maybe_get_asset_value_in_portfolio(token) {
+                    result.push_str(&format!(
+                        "- {} ICP worth of {} \n",
+                        DisplayAmount(value),
+                        token
+                    ));
+                }
+            }
+
+            result
+        }),
+        read_state(|s| s.get_all_prices())
+    )
 }
 
 #[query]
@@ -74,22 +99,13 @@ fn get_miner() -> Option<Principal> {
 }
 
 #[query]
-fn get_queue_len() -> u64 {
-    assert_eq!(
-        ic_cdk::caller(),
-        Principal::from_text("dmhsm-cyaaa-aaaal-qjrdq-cai").unwrap()
-    );
-    alice::memory::get_queue_len()
-}
-
-#[query]
 fn get_alice_portfolio() -> Vec<Asset> {
     read_state(|s| {
         Token::iter()
             .map(|token| {
                 if token != Token::Icp {
                     Asset {
-                        quote: s.maybe_get_last_quote(token).map(|q| q.value),
+                        quote: alice::memory::maybe_get_last_quote(token).map(|q| q.value),
                         amount: s.get_balance(token),
                         name: format!("{token}"),
                     }
@@ -106,35 +122,77 @@ fn get_alice_portfolio() -> Vec<Asset> {
 }
 
 #[update(hidden = true)]
-fn set_api_key(key: String) {
-    assert_eq!(
-        ic_cdk::caller(),
-        Principal::from_text("dmhsm-cyaaa-aaaal-qjrdq-cai").unwrap()
-    );
-    alice::memory::set_api_key(key);
+pub async fn launch_token(arg: LaunchTokenArg) -> Result<u64, String> {
+    let sns_gov_id = Principal::from_text("oa5dz-haaaa-aaaaq-aaegq-cai").unwrap();
+
+    if ic_cdk::caller() != sns_gov_id {
+        return Err("only the ALICE DAO can call this endpoint".to_string());
+    }
+    let launchpad_id = Principal::from_text("h7uwa-hyaaa-aaaam-qbgvq-cai").unwrap();
+
+    ic_cdk::api::call::call(
+        launchpad_id,
+        "create_token_and_buy",
+        (
+            CreateTokenArg {
+                name: arg.name,
+                description: arg.description,
+                ticker: arg.ticker,
+                image: arg.image,
+                maybe_kong_swap: None,
+                maybe_telegram: None,
+                maybe_open_chat: None,
+                maybe_website: None,
+                maybe_twitter: None,
+            },
+            10 * 100_000_000,
+        ),
+    )
+    .await
+    .map(|(token_id,)| token_id)
+    .map_err(|(code, msg)| format!("Error {}: {msg}", code as i32))
 }
 
-#[update]
-async fn spawn_miner() -> Result<Principal, String> {
-    if let Some(bob_miner) = alice::memory::get_bob_miner() {
-        return Err(format!("bob miner already spawned: {bob_miner}"));
-    }
-    let block_index = alice::ledger::transfer_to_miner().await?;
-    let miner = alice::bob::spawn_miner(block_index).await?;
-    alice::memory::set_bob_miner(miner);
-    Ok(miner)
-}
+#[update(hidden = true)]
+async fn proposal_for_token_creation(
+    arg: ProposalArg,
+) -> Result<Option<ProposalId>, GovernanceError> {
+    let sns_gov_id = Principal::from_text("oa5dz-haaaa-aaaaq-aaegq-cai").unwrap();
 
-#[query(hidden = true)]
-fn cleanup_response(mut args: TransformArgs) -> HttpResponseCleanUp {
-    args.response.headers.clear();
-    if args.response.status == 200u64 {
-        let response: alice::llm::PromptResponse =
-            serde_json::from_slice(&args.response.body).unwrap();
+    let (result,): (ManageNeuronResponse,) = ic_cdk::api::call::call(
+        sns_gov_id,
+        "manage_neuron",
+        (ManageNeuron {
+            subaccount: arg.neuron_id.subaccount().unwrap().into(),
+            command: Some(v1::manage_neuron::Command::MakeProposal(Proposal {
+                title: format!(
+                    "Launch {} ({}) on launch.bob.fun?",
+                    arg.function_arg.name, arg.function_arg.ticker
+                ),
+                summary: format!(
+                    "Shall Alice launch {} ({})?\n{}",
+                    arg.function_arg.name, arg.function_arg.ticker, arg.function_arg.description
+                ),
+                action: Some(Action::ExecuteGenericNervousSystemFunction(
+                    ExecuteGenericNervousSystemFunction {
+                        function_id: TRIGGER_TOKEN_CREATION_FUNCTION_ID,
+                        payload: Encode!(&(arg.function_arg)).unwrap(),
+                    },
+                )),
+                url: "https://launch.bob.fun".to_string(),
+            })),
+        },),
+    )
+    .await
+    .map_err(|(code, msg)| GovernanceError {
+        error_type: code as i32,
+        error_message: msg,
+    })?;
 
-        args.response.body = serde_json::to_string(&response).unwrap().into_bytes();
-    }
-    args.response
+    Ok(result.command.and_then(|command| match command {
+        v1::manage_neuron_response::Command::MakeProposal(response) => response.proposal_id,
+        _ => None,
+    }))
 }
 
 #[query(hidden = true)]

@@ -32,9 +32,11 @@ icrc-ledger-client-cdk = { git = "https://github.com/dfinity/ic/", rev = "bc83b4
 ic-types = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 icrc-ledger-types = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-ledger-core = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
+ic-llm = "1.0.1"
 icp-ledger = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-icp-index = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-icrc1-ledger = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
+ic-sns-governance = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-ledger-types = "0.12.0"
 pocket-ic = "6.0.0"
 rand = "0.8"

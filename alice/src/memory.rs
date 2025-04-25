@@ -1,4 +1,4 @@
-use crate::{Action, TradeAction};
+use crate::{timestamp_nanos, Action, Quote, Token, TradeAction, ONE_HOUR_NANOS};
 use candid::Principal;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
@@ -8,6 +8,8 @@ use ic_stable_structures::{
 };
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::VecDeque;
+use strum::IntoEnumIterator;
 
 /// A helper type implementing Storable for all
 /// serde-serializable types using the CBOR encoding.
@@ -33,14 +35,28 @@ where
     const BOUND: Bound = Bound::Unbounded;
 }
 
+impl Storable for Token {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut buf = vec![];
+        ciborium::ser::into_writer(&self, &mut buf).unwrap();
+        Cow::Owned(buf)
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        ciborium::de::from_reader(bytes.as_ref()).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
 // NOTE: ensure that all memory ids are unique and
 // do not change across upgrades!
 const BOB_MINER_ID: MemoryId = MemoryId::new(0);
 const ACTION_QUEUE_ID: MemoryId = MemoryId::new(1);
 const TRADE_HISTORY_INDX_MEM_ID: MemoryId = MemoryId::new(2);
 const TRADE_HISTORY_DATA_MEM_ID: MemoryId = MemoryId::new(3);
-const API_KEY_ID: MemoryId = MemoryId::new(4);
-const CONTEXT_ID: MemoryId = MemoryId::new(5);
+const XAI_API_KEY_ID: MemoryId = MemoryId::new(4);
+const QUOTES_MEM_ID: MemoryId = MemoryId::new(5);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -53,8 +69,8 @@ thread_local! {
         RefCell::new(StableCell::init(mm.borrow().get(BOB_MINER_ID), None).unwrap())
     });
 
-    static API_KEY: RefCell<StableCell<Option<String>, VM>> = MEMORY_MANAGER.with(|mm| {
-        RefCell::new(StableCell::init(mm.borrow().get(API_KEY_ID), None).unwrap())
+    static XAI_API_KEY: RefCell<StableCell<Option<String>, VM>> = MEMORY_MANAGER.with(|mm| {
+        RefCell::new(StableCell::init(mm.borrow().get(XAI_API_KEY_ID), None).unwrap())
     });
 
     static ACTION_QUEUE: RefCell<StableBTreeMap<u64, Cbor<Action>, VM>> = MEMORY_MANAGER.with(|mm| {
@@ -69,9 +85,64 @@ thread_local! {
             ).expect("failed to initialize the log"))
     });
 
-    static CONTEXT: RefCell<StableCell<Option<String>, VM>> = MEMORY_MANAGER.with(|mm| {
-        RefCell::new(StableCell::init(mm.borrow().get(CONTEXT_ID), None).unwrap())
+    static QUOTES: RefCell<StableBTreeMap<Token, Cbor<VecDeque<Quote>>, VM>> =
+        MEMORY_MANAGER.with(|mm| {
+            RefCell::new(StableBTreeMap::new(
+                mm.borrow().get(QUOTES_MEM_ID)
+            ))
+        });
+}
+
+pub fn insert_quote(quote: Quote, token: Token) {
+    QUOTES.with(|q| {
+        let maybe_deque = q.borrow().get(&token);
+        if let Some(mut deque) = maybe_deque {
+            deque.0.push_back(quote);
+            q.borrow_mut().insert(token, deque);
+        } else {
+            q.borrow_mut().insert(token, Cbor(VecDeque::from([quote])));
+        }
     });
+}
+
+pub fn remove_old_quotes() {
+    QUOTES.with(|q| {
+        for token in Token::iter() {
+            let maybe_deque = q.borrow().get(&token);
+            if let Some(mut deque) = maybe_deque {
+                while let Some(quote) = deque.0.front() {
+                    if timestamp_nanos() > quote.ts + 30 * 24 * ONE_HOUR_NANOS {
+                        deque.0.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+                q.borrow_mut().insert(token, deque);
+            }
+        }
+    });
+}
+
+pub fn get_quotes(token: Token) -> Vec<Quote> {
+    QUOTES.with(|q| {
+        q.borrow()
+            .get(&token)
+            .map(|deque| deque.0)
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
+    })
+}
+
+pub fn maybe_get_last_quote(token: Token) -> Option<Quote> {
+    QUOTES.with(|q| {
+        q.borrow()
+            .get(&token)
+            .map(|deque| deque.0)
+            .unwrap_or_default()
+            .into_iter()
+            .last()
+    })
 }
 
 pub fn push_trade_action(trade_action: TradeAction) {
@@ -114,25 +185,13 @@ pub fn get_bob_miner() -> Option<Principal> {
 }
 
 pub fn set_api_key(key: String) {
-    API_KEY.with(|b| {
-        assert!(b.borrow().get().is_none());
+    XAI_API_KEY.with(|b| {
         b.borrow_mut().set(Some(key)).unwrap();
     });
 }
 
 pub fn get_api_key() -> Option<String> {
-    API_KEY.with(|b| b.borrow().get().clone())
-}
-
-pub fn set_context(context: String) {
-    CONTEXT.with(|b| {
-        assert!(b.borrow().get().is_none());
-        b.borrow_mut().set(Some(context)).unwrap();
-    });
-}
-
-pub fn get_context() -> Option<String> {
-    CONTEXT.with(|b| b.borrow().get().clone())
+    XAI_API_KEY.with(|b| b.borrow().get().clone())
 }
 
 pub fn push_action(action: Action) {

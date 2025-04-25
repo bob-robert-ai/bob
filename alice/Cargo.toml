@@ -8,12 +8,15 @@ candid = { workspace = true }
 ciborium = { workspace = true }
 futures = { workspace = true }
 ic0 = { workspace = true }
+ic-base-types = { workspace = true }
 ic-canister-log = { workspace = true }
 ic-canisters-http-types = { workspace = true }
 ic-cdk = { workspace = true }
+ic-llm = { workspace = true }
 ic-ledger-types = { workspace = true }
 icrc-ledger-types = { workspace = true }
 icrc-ledger-client-cdk = { workspace = true }
+ic-sns-governance = { workspace = true }
 ic-stable-structures = { workspace = true }
 scopeguard = { workspace = true }
 serde = { workspace = true }

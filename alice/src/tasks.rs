@@ -20,6 +20,7 @@ pub enum TaskType {
     TakeDecision,
     FetchQuotes,
     RefreshMinerBurnRate,
+    TryVoteOnProposal,
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, CandidType)]

@@ -4,23 +4,21 @@ use crate::ics_pool::{
     deposit_from, get_pool, quote, swap, withdraw, DepositArgs, SwapArgs, WithdrawArgs,
 };
 use crate::ledger::{approve, balance_of};
-use crate::llm::{Message, Prompt};
 use crate::logs::{DEBUG, INFO};
-use crate::memory::{
-    get_context, next_action, pop_front_action, push_action, push_actions, push_trade_action,
-};
+use crate::memory::{next_action, pop_front_action, push_action, push_actions, push_trade_action};
 use crate::state::{mutate_state, read_state, Quote};
 use crate::tasks::{schedule_after, schedule_now, TaskType};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use futures::future::join_all;
 use ic_canister_log::log;
-use ic_cdk::api::management_canister::main::raw_rand;
+use ic_sns_governance::pb::v1::NeuronId;
 use serde::Serialize;
 use std::fmt;
 use std::time::Duration;
 use strum::{EnumIter, IntoEnumIterator};
 
 pub mod bob;
+pub mod governance;
 pub mod guard;
 pub mod ics_pool;
 pub mod ledger;
@@ -29,6 +27,9 @@ pub mod logs;
 pub mod memory;
 pub mod state;
 pub mod tasks;
+
+// Custom SNS function to launch a token on https://launch.bob.fun.
+pub const TRIGGER_TOKEN_CREATION_FUNCTION_ID: u64 = 1_000;
 
 pub const ICP_LEDGER: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai";
 pub const BOB_LEDGER: &str = "7pail-xaaaa-aaaas-aabmq-cai";
@@ -40,10 +41,15 @@ pub const ICPSWAP_DATA_CANISTER: &str = "5kfng-baaaa-aaaag-qj3da-cai";
 
 const ONE_HOUR_NANOS: u64 = 3600 * 1_000_000_000;
 
-// 4 hours
-pub const TAKE_DECISION_DELAY: Duration = Duration::from_secs(14_400);
+// 1 hours
+pub const TAKE_DECISION_DELAY: Duration = Duration::from_secs(3_600);
 // 1 hour
 const FETCH_CONTEXT_DELAY: Duration = Duration::from_secs(3_600);
+
+pub const ALICE_NEURON_SUBACCOUNT: [u8; 32] = [
+    114, 95, 65, 238, 165, 107, 221, 30, 114, 42, 86, 41, 228, 107, 3, 28, 179, 32, 43, 149, 85,
+    14, 118, 227, 139, 192, 141, 138, 30, 225, 114, 218,
+];
 
 #[derive(
     Debug, EnumIter, CandidType, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize,
@@ -59,6 +65,34 @@ pub struct Asset {
     pub quote: Option<u64>,
     pub amount: u64,
     pub name: String,
+}
+
+#[derive(Debug, CandidType, Deserialize)]
+pub struct LaunchTokenArg {
+    pub name: String,
+    pub ticker: String,
+    pub description: String,
+    pub image: String,
+}
+
+#[derive(Debug, CandidType, Deserialize)]
+pub struct ProposalArg {
+    pub function_arg: LaunchTokenArg,
+    pub neuron_id: NeuronId,
+}
+
+// From the launchpad .did file.
+#[derive(Debug, CandidType, Deserialize)]
+pub struct CreateTokenArg {
+    pub maybe_website: Option<String>,
+    pub ticker: String,
+    pub name: String,
+    pub maybe_open_chat: Option<String>,
+    pub description: String,
+    pub maybe_kong_swap: Option<bool>,
+    pub image: String,
+    pub maybe_twitter: Option<String>,
+    pub maybe_telegram: Option<String>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -119,7 +153,7 @@ impl Token {
     fn fee_e8s(&self) -> u64 {
         match self {
             Token::Icp => 10_000,
-            Token::Alice => 100_000_000,
+            Token::Alice => 500_000_000,
             Token::Bob => 1_000_000,
         }
     }
@@ -158,19 +192,13 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
         return Err(format!("Cannot buy nor sell ICP",));
     }
 
-    let amount_to_trade = match action.as_str() {
+    let mut amount_to_trade = match action.as_str() {
         "buy" => read_state(|s| s.amount_to_buy(token)),
         "sell" => read_state(|s| s.balances.get(&token).unwrap_or(&0).clone()) / 10,
         _ => return Err("Unknown action".to_string()),
     };
 
-    if amount_to_trade < token.minimum_amount_to_trade() {
-        return Err(format!(
-            "{token} balance too low, minimum to trade is {} got {}",
-            DisplayAmount(token.minimum_amount_to_trade()),
-            DisplayAmount(amount_to_trade)
-        ));
-    }
+    amount_to_trade = amount_to_trade.max(token.minimum_amount_to_trade());
 
     match action.as_str() {
         "buy" => Ok(TradeAction::Buy {
@@ -303,6 +331,7 @@ pub async fn process_logic() -> Result<bool, String> {
     if let Some(action) = next_action() {
         return match execute_action(action.clone()).await {
             Ok(()) => {
+                log!(INFO, "[process_logic] processed {action:?}");
                 pop_front_action();
                 Ok(true)
             }
@@ -453,28 +482,12 @@ fn build_portfolio() -> String {
         let mut result = String::new();
 
         for token in Token::iter() {
-            if let Some(balance) = s.balances.get(&token) {
-                result.push_str(&format!("- {} {}", DisplayAmount(*balance), token));
-                if token == Token::Icp {
-                    if let Some(price) = s.prices.get(&Token::Bob).unwrap().get_latest() {
-                        if price.token1Symbol.to_lowercase() == format!("{token}").to_lowercase() {
-                            result.push_str(&format!(", 1 {token} = ${}\n", price.token1Price));
-                        }
-                    } else {
-                        result.push_str(" \n");
-                    }
-                } else if let Some(price) = s.prices.get(&token).unwrap().get_latest() {
-                    if price.token0Symbol.to_lowercase() == format!("{token}").to_lowercase() {
-                        result.push_str(&format!(", 1 {token} = ${}\n", price.token0Price));
-                    } else if price.token1Symbol.to_lowercase() == format!("{token}").to_lowercase()
-                    {
-                        result.push_str(&format!(", 1 {token} = ${}\n", price.token1Price));
-                    } else {
-                        result.push_str(" \n");
-                    }
-                } else {
-                    result.push_str(" \n");
-                }
+            if let Some(value) = s.maybe_get_asset_value_in_portfolio(token) {
+                result.push_str(&format!(
+                    "- {} ICP worth of {} \n",
+                    DisplayAmount(value),
+                    token
+                ));
             }
         }
 
@@ -484,86 +497,43 @@ fn build_portfolio() -> String {
 
 pub fn build_user_prompt() -> String {
     format!(
-        "Your portfolio is: \n{}
-        You can *only* answer with one of the following: BUY BOB, SELL BOB, BUY ALICE, HODL.
-        What should you do next to maximize shareholder value? 
-        ------- More Context
-        The current evolution of each asset in your portfolio is the following, each entry is recorded every 4 hours: \n{}",
+        "Your portfolio valued in ICP terms is:
+        {}
+        You can *only* answer with one of the following: BUY ALICE, SELL BOB, BUY BOB, HODL.
+        What should you do next?
+        --------------
+        {}
+        ",
         build_portfolio(),
         read_state(|s| s.get_all_prices())
     )
 }
 
-fn get_grok_prompt(user_prompt: String, seed: i32) -> Prompt {
-    Prompt {
-        messages: vec![
-            Message {
-                role: "system".to_string(),
-                content: get_context().unwrap(),
-            },
-            Message {
-                role: "user".to_string(),
-                content: user_prompt,
-            },
-        ],
-        model: "grok-beta".to_string(),
-        stream: false,
-        temperature: 0,
-        seed,
-        top_logprobs: 0,
-        top_p: 0,
-    }
-}
-
-fn get_deepseek_prompt(user_prompt: String, seed: i32) -> Prompt {
-    Prompt {
-        messages: vec![
-            Message {
-                role: "system".to_string(),
-                content: get_context().unwrap(),
-            },
-            Message {
-                role: "user".to_string(),
-                content: user_prompt,
-            },
-        ],
-        model: "deepseek-chat".to_string(),
-        stream: false,
-        temperature: 0,
-        seed,
-        top_logprobs: 0,
-        top_p: 0,
-    }
+pub fn get_ic_prompt(user_prompt: String) -> String {
+    format!("{} ----- {}", crate::llm::PROMPT, user_prompt)
 }
 
 pub async fn take_decision() -> Result<TradeAction, String> {
-    if read_state(|s| s.prices.get(&Token::Alice).unwrap().get_prices().len() < 4) {
+    if read_state(|s| s.prices.get(&Token::Alice).unwrap().get_prices().len() < 1) {
         return Err("Not yet ready to make a decision, not enough price history".to_string());
     }
-    if let Ok((random_array,)) = raw_rand().await {
-        let seed = i32::from_le_bytes(random_array[..4].try_into().unwrap()) % i32::MAX;
-        let seed = if seed < 0 { -seed } else { seed };
-        let prompt = build_user_prompt();
+    let prompt = build_user_prompt();
+    log!(INFO, "[take_decision] fetching ic llm 8b...");
 
-        match crate::llm::prompt_xai(get_grok_prompt(prompt, seed)).await {
-            Ok(result) => match parse_trade_action(&result.choices[0].message.content) {
-                Ok(action) => {
-                    push_trade_action(action.clone());
-                    push_actions(action.actions());
-                    schedule_now(TaskType::ProcessLogic);
-                    Ok(action)
-                }
-                Err(e) => Err(e),
-            },
-            Err(e) => Err(e.to_string()),
+    let result = crate::llm::prompt_ic(crate::llm::PROMPT.to_string(), prompt).await;
+    match parse_trade_action(&result) {
+        Ok(action) => {
+            push_trade_action(action.clone());
+            push_actions(action.actions());
+            schedule_now(TaskType::ProcessLogic);
+            Ok(action)
         }
-    } else {
-        Err("Failed to generate random seed".to_string())
+        Err(e) => Err(e),
     }
 }
 
 fn is_quote_too_early(token: Token) -> bool {
-    if let Some(quote) = read_state(|s| s.maybe_get_last_quote(token)) {
+    if let Some(quote) = crate::memory::maybe_get_last_quote(token) {
         timestamp_nanos() < quote.ts + ONE_HOUR_NANOS
     } else {
         false
@@ -600,7 +570,7 @@ pub async fn fetch_quotes() {
                     value: value.clone().0.try_into().unwrap(),
                     ts: ic_cdk::api::time(),
                 };
-                mutate_state(|s| s.insert_quote(token, quote));
+                crate::memory::insert_quote(quote, token);
             }
             Err(_) => {
                 schedule_now(TaskType::FetchQuotes);
@@ -673,9 +643,14 @@ pub fn timer() {
                         Err(_) => return,
                     };
 
+                    let _enqueue_followup_guard = scopeguard::guard((), |_| {
+                        schedule_after(Duration::from_secs(60), TaskType::TakeDecision);
+                    });
+
                     let result = take_decision().await;
                     log!(INFO, "[TakeDecision] Took a new decision: {:?}", result);
-                    schedule_after(TAKE_DECISION_DELAY, TaskType::RefreshContext);
+                    scopeguard::ScopeGuard::into_inner(_enqueue_followup_guard);
+                    schedule_after(TAKE_DECISION_DELAY, TaskType::TakeDecision);
                 });
             }
             TaskType::ProcessLogic => {
@@ -691,10 +666,10 @@ pub fn timer() {
 
                     match process_logic().await {
                         Ok(true) => {
-                            schedule_now(TaskType::ProcessLogic);
+                            schedule_after(Duration::from_secs(240), TaskType::ProcessLogic);
                         }
                         Ok(false) => {
-                            schedule_after(Duration::from_secs(240), TaskType::ProcessLogic);
+                            schedule_after(Duration::from_secs(440), TaskType::ProcessLogic);
                         }
                         Err(e) => {
                             log!(INFO, "[ProcessLogic] Failed to process logic: {e}");
@@ -713,7 +688,7 @@ pub fn timer() {
                     };
 
                     log!(DEBUG, "[FetchQuotes] Fetching quotes.");
-                    mutate_state(|s| s.suppress_old_quotes());
+                    crate::memory::remove_old_quotes();
                     fetch_quotes().await;
                 });
             }
@@ -724,14 +699,23 @@ pub fn timer() {
                         Err(_) => return,
                     };
 
-                    let result = refresh_miner_settings().await;
-                    log!(
-                        INFO,
-                        "[RefreshMinerBurnRate] refreshed minter burn rate: {:?}",
-                        result
-                    );
+                    let _result = refresh_miner_settings().await;
                     schedule_after(
                         Duration::from_secs(24 * 60 * 60),
+                        TaskType::RefreshMinerBurnRate,
+                    );
+                });
+            }
+            TaskType::TryVoteOnProposal => {
+                ic_cdk::spawn(async move {
+                    let _guard = match TaskGuard::new(task_type) {
+                        Ok(guard) => guard,
+                        Err(_) => return,
+                    };
+
+                    crate::governance::process_proposals().await;
+                    schedule_after(
+                        Duration::from_secs(12 * 60 * 60),
                         TaskType::RefreshMinerBurnRate,
                     );
                 });

@@ -1,5 +1,4 @@
 type Asset = record { name : text; quote : opt nat64; amount : nat64 };
-type Result = variant { Ok : principal; Err : text };
 type Token = variant { Bob; Icp; Alice };
 type TradeAction = variant {
   Buy : record { ts : nat64; token : Token; amount : nat64 };
@@ -10,9 +9,7 @@ service : () -> {
   get_all_prices : () -> (text) query;
   get_balances : () -> (vec record { Token; nat64 }) query;
   get_miner : () -> (opt principal) query;
-  get_queue_len : () -> (nat64) query;
   get_real_time_context : () -> (text) query;
   get_value_at_risk : (Token) -> (float64) query;
   last_trade_action : () -> (vec TradeAction) query;
-  spawn_miner : () -> (Result);
 }

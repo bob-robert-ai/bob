@@ -1,6 +1,7 @@
 use crate::ics_pool::PublicPoolOverView;
-use crate::{timestamp_nanos, TaskType, Token, ONE_HOUR_NANOS};
-use candid::Principal;
+use crate::{TaskType, Token};
+use candid::{Deserialize, Principal};
+use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use strum::IntoEnumIterator;
@@ -37,7 +38,7 @@ impl PriceTracker {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Quote {
     pub value: u64,
     pub ts: u64,
@@ -49,8 +50,6 @@ pub struct State {
 
     pub principal_guards: BTreeSet<Principal>,
     pub active_tasks: BTreeSet<TaskType>,
-
-    pub token_to_quotes: BTreeMap<Token, VecDeque<Quote>>,
 }
 
 impl State {
@@ -63,7 +62,6 @@ impl State {
             ]),
             principal_guards: Default::default(),
             active_tasks: Default::default(),
-            token_to_quotes: Default::default(),
         }
     }
 
@@ -71,19 +69,6 @@ impl State {
         if let Some(price_tracker) = self.prices.get_mut(&token) {
             price_tracker.add_price(price);
         }
-    }
-
-    pub fn insert_quote(&mut self, token: Token, quote: Quote) {
-        self.token_to_quotes
-            .entry(token)
-            .and_modify(|quotes| {
-                quotes.push_back(quote.clone());
-            })
-            .or_insert({
-                let mut deque = VecDeque::new();
-                deque.push_back(quote);
-                deque
-            });
     }
 
     pub fn get_all_prices(&self) -> String {
@@ -107,19 +92,11 @@ impl State {
         self.balances.get(&token).unwrap_or(&0).clone()
     }
 
-    pub fn maybe_get_last_quote(&self, token: Token) -> Option<Quote> {
-        self.token_to_quotes
-            .get(&token)
-            .and_then(|quotes| quotes.back())
-            .clone()
-            .cloned()
-    }
-
     pub fn maybe_get_asset_value_in_portfolio(&self, token: Token) -> Option<u64> {
         if token == Token::Icp {
             return Some(read_state(|s| s.get_balance(token)));
         }
-        self.maybe_get_last_quote(token)
+        crate::memory::maybe_get_last_quote(token)
             .map(|quote| self.get_balance(token) * quote.value / 100_000_000)
     }
 
@@ -137,11 +114,7 @@ impl State {
 
     pub fn compute_token_returns(&self, token: Token) -> Vec<f64> {
         let mut result = vec![];
-        let data: VecDeque<Quote> = self
-            .token_to_quotes
-            .get(&token)
-            .unwrap_or(&VecDeque::new())
-            .clone();
+        let data: Vec<Quote> = crate::memory::get_quotes(token);
 
         let quotes: Vec<&Quote> = data.iter().collect::<Vec<&Quote>>();
 
@@ -169,51 +142,40 @@ impl State {
         losses[var_index]
     }
 
-    pub fn var_majorant(&self, portfolio_value: f64, asset_value: f64) -> f64 {
+    pub fn var_majorant(&self, portfolio_value: u64, asset_value: u64) -> f64 {
         let mut result: f64 = 0.0;
         for token in Token::iter() {
             if token == Token::Icp {
                 continue;
             }
-            let weight: f64 = asset_value / portfolio_value;
+            let weight: f64 = asset_value as f64 / portfolio_value as f64;
             result += weight * self.get_value_at_risk(token);
         }
         result.min(0.1)
     }
 
     pub fn amount_to_buy(&self, token: Token) -> u64 {
-        let portfolio_value = self.maybe_portfolio_value().unwrap_or(0) as f64;
-        let quote = self
-            .maybe_get_last_quote(token)
-            .map(|q| q.value)
-            .unwrap_or(0) as f64;
-        let var_maj = self.var_majorant(portfolio_value, quote);
-        let var = self.get_value_at_risk(token);
-
-        if portfolio_value + quote <= 0.0 {
-            return 0;
-        }
-        let max_trade = self.get_balance(token) / 10;
-        if var <= 0.0 {
-            return max_trade;
-        }
-
-        let risk_trade = 100_000_000.0 * (0.1 - var_maj) * portfolio_value / (quote * var);
-
-        max_trade.min(risk_trade as u64)
-    }
-
-    pub fn suppress_old_quotes(&mut self) {
-        for token in Token::iter() {
-            if let Some(quotes) = self.token_to_quotes.get_mut(&token) {
-                while let Some(quote) = quotes.front() {
-                    if timestamp_nanos() > quote.ts + 30 * 24 * ONE_HOUR_NANOS {
-                        quotes.pop_front();
-                    } else {
-                        break;
-                    }
-                }
+        let default_trade = self.get_balance(Token::Icp) / 20;
+        if let Some(portfolio_value) = self.maybe_portfolio_value() {
+            let quote = crate::memory::maybe_get_last_quote(token)
+                .map(|q| q.value)
+                .unwrap_or(0);
+            if quote <= 0 {
+                return default_trade;
             }
+
+            let var_maj = self.var_majorant(
+                portfolio_value,
+                quote * self.get_balance(token) / 100_000_000,
+            );
+            let var = self.get_value_at_risk(token);
+
+            let max_valid_amount = (100_000_000.0 * (0.1 - var_maj) * (portfolio_value as f64)
+                / (quote as f64 * var)) as u64;
+
+            return default_trade.min(max_valid_amount);
+        } else {
+            return default_trade;
         }
     }
 }
