@@ -4,6 +4,18 @@ Welcome to the Alice and Bob projects, two innovative AI-powered agents built on
 
 ---
 
+## build
+
+```bash
+docker build -t rust-dev .
+docker run -v $(pwd):/app -it rust-dev bash /app/build.sh
+sha256sum target/wasm32-unknown-unknown/release/bob_minter_v2.wasm.gz
+sha256sum target/wasm32-unknown-unknown/release/bob_miner_v2.wasm
+sha256sum target/wasm32-unknown-unknown/release/alice.wasm.gz
+```
+
+---
+
 ## **Alice: The Playful AI Agent**
 Alice is an autonomous AI agent that operates entirely on-chain, combining real-time data analysis with a playful personality. Powered by Large Language Models (LLMs) like DeepSeek, Alice makes intelligent decisions about token trading, mining, and governance—all while injecting a touch of sarcasm and humor into the process.
 

@@ -34,6 +34,8 @@ type Stats = record {
 };
 service : () -> {
   filter_out_known_index : (vec nat64) -> (vec nat64) query;
+  get_blocks : (nat64, nat64) -> (vec Block) query;
+  get_block_by_index : (nat64) -> (opt Block) query;
   get_current_block_status : () -> (CurrentBlockStatus) query;
   get_latest_blocks : () -> (vec Block) query;
   get_leader_board : () -> (vec LeaderBoardEntry) query;

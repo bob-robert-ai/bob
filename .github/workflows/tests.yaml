@@ -57,7 +57,7 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo clippy --locked --verbose --tests --workspace -- -D clippy::all
-          cargo clippy --locked --verbose --target wasm32-unknown-unknown -p bob_miner_v2 -p bob-minter-v2 -- -D clippy::all
+          cargo clippy --locked --verbose --target wasm32-unknown-unknown -p bob_miner_v2 -p bob_minter_v2 -- -D clippy::all
         env:
           RUST_BACKTRACE: 1
   unit-tests:

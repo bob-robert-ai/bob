@@ -52,6 +52,12 @@ pub struct State {
     pub active_tasks: BTreeSet<TaskType>,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl State {
     pub fn new() -> State {
         State {
@@ -78,7 +84,7 @@ impl State {
             let prices_str = price_tracker
                 .get_prices()
                 .iter()
-                .map(|price| format!("{}", price.display()))
+                .map(|price| price.display().to_string())
                 .collect::<Vec<String>>()
                 .join(", ");
 
@@ -89,7 +95,7 @@ impl State {
     }
 
     pub fn get_balance(&self, token: Token) -> u64 {
-        self.balances.get(&token).unwrap_or(&0).clone()
+        *self.balances.get(&token).unwrap_or(&0)
     }
 
     pub fn maybe_get_asset_value_in_portfolio(&self, token: Token) -> Option<u64> {
@@ -119,8 +125,8 @@ impl State {
         let quotes: Vec<&Quote> = data.iter().collect::<Vec<&Quote>>();
 
         for i in 1..quotes.len() {
-            let curr = quotes[i].value.clone() as f64;
-            let previous = quotes[i - 1].value.clone() as f64;
+            let curr = quotes[i].value as f64;
+            let previous = quotes[i - 1].value as f64;
             let pct_change = (curr - previous) / previous;
             result.push(pct_change);
         }
@@ -136,7 +142,7 @@ impl State {
         losses.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let var_index = (0.95 * losses.len() as f64) as usize;
 
-        if losses.len() == 0 {
+        if losses.is_empty() {
             return 0.0;
         }
         losses[var_index]
@@ -160,7 +166,7 @@ impl State {
             let quote = crate::memory::maybe_get_last_quote(token)
                 .map(|q| q.value)
                 .unwrap_or(0);
-            if quote <= 0 {
+            if quote == 0 {
                 return default_trade;
             }
 
@@ -173,9 +179,9 @@ impl State {
             let max_valid_amount = (100_000_000.0 * (0.1 - var_maj) * (portfolio_value as f64)
                 / (quote as f64 * var)) as u64;
 
-            return default_trade.min(max_valid_amount);
+            default_trade.min(max_valid_amount)
         } else {
-            return default_trade;
+            default_trade
         }
     }
 }

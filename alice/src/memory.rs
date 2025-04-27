@@ -181,7 +181,7 @@ pub fn set_bob_miner(p: Principal) {
 }
 
 pub fn get_bob_miner() -> Option<Principal> {
-    BOB_MINER.with(|b| b.borrow().get().clone())
+    BOB_MINER.with(|b| *b.borrow().get())
 }
 
 pub fn set_api_key(key: String) {

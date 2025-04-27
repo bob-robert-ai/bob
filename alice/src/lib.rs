@@ -189,12 +189,12 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
     };
 
     if token == Token::Icp {
-        return Err(format!("Cannot buy nor sell ICP",));
+        return Err("Cannot buy nor sell ICP".to_string());
     }
 
     let mut amount_to_trade = match action.as_str() {
         "buy" => read_state(|s| s.amount_to_buy(token)),
-        "sell" => read_state(|s| s.balances.get(&token).unwrap_or(&0).clone()) / 10,
+        "sell" => read_state(|s| *s.balances.get(&token).unwrap_or(&0)) / 10,
         _ => return Err("Unknown action".to_string()),
     };
 
@@ -370,7 +370,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
             .await
             {
                 Ok(_) => Ok(()),
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
         Action::Swap {
@@ -413,7 +413,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
                     });
                     Ok(())
                 }
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
         Action::Withdraw {
@@ -436,7 +436,7 @@ async fn execute_action(action: Action) -> Result<(), String> {
                     schedule_now(TaskType::RefreshContext);
                     Ok(())
                 }
-                Err(e) => Err(format!("{e}")),
+                Err(e) => Err(e.to_string()),
             }
         }
     }
@@ -464,13 +464,10 @@ pub async fn refresh_prices() {
 
     let futures = tokens.into_iter().map(|token| async move {
         let pool = token.pool_id();
-        match get_pool(pool).await {
-            Ok(price) => {
-                mutate_state(|s| {
-                    s.insert_price(token, price);
-                });
-            }
-            Err(_) => {}
+        if let Ok(price) = get_pool(pool).await {
+            mutate_state(|s| {
+                s.insert_price(token, price);
+            });
         }
     });
 
@@ -514,7 +511,7 @@ pub fn get_ic_prompt(user_prompt: String) -> String {
 }
 
 pub async fn take_decision() -> Result<TradeAction, String> {
-    if read_state(|s| s.prices.get(&Token::Alice).unwrap().get_prices().len() < 1) {
+    if read_state(|s| s.prices.get(&Token::Alice).unwrap().get_prices().is_empty()) {
         return Err("Not yet ready to make a decision, not enough price history".to_string());
     }
     let prompt = build_user_prompt();
@@ -547,14 +544,14 @@ pub async fn fetch_quotes() {
             let result = quote(
                 token.pool_id(),
                 SwapArgs {
-                    amount_in: format!("100_000_000"),
+                    amount_in: "100_000_000".to_string(),
                     zero_for_one: TradeAction::Sell {
                         token,
                         amount: 0,
                         ts: 0,
                     }
                     .get_zero_for_one(),
-                    amount_out_minimum: format!(""),
+                    amount_out_minimum: String::new(),
                 },
             )
             .await;
@@ -716,7 +713,7 @@ pub fn timer() {
                     crate::governance::process_proposals().await;
                     schedule_after(
                         Duration::from_secs(12 * 60 * 60),
-                        TaskType::RefreshMinerBurnRate,
+                        TaskType::TryVoteOnProposal,
                     );
                 });
             }

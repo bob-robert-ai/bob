@@ -13,8 +13,8 @@ COMMIT_ID=${3:-bc83b42ae2b8c8246e6387731910842a12ebee90}
 
 echo "Downloading $CANISTER_NAME at commit $COMMIT_ID"
 
-mkdir -p integration-tests/wasms
-cd integration-tests/wasms
+mkdir -p bob/integration-tests/wasms
+cd bob/integration-tests/wasms
 
 HTTP_CODE=$(curl -so $CANISTER_NAME.wasm.gz https://download.dfinity.systems/ic/$COMMIT_ID/canisters/$FILE_NAME.wasm.gz --write-out "%{http_code}")
 

@@ -1,6 +1,7 @@
 target/
 .dfx/
 .env
-integration-tests/pocket-ic
-integration-tests/wasms/
+bob/integration-tests/pocket-ic
+bob/integration-tests/wasms/
 **/*.swp
+**/.DS_Store
