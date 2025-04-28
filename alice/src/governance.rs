@@ -1,3 +1,4 @@
+use crate::taggr::add_post;
 use crate::INFO;
 use candid::Principal;
 use ic_canister_log::log;
@@ -99,6 +100,9 @@ const BASE_PROMPT_VOTING: &str = "
 Evaluate the following proposal for its impact on the Alice DAO's security, particularly against threats like Borovans accumulating undue influence, and its alignment with our strategic objectives: maximizing BOBs deflationary value through ICP cycle burning, maintaining a balanced and diversified portfolio, and minimizing governance risks. Assess whether the proposal strengthens DAO integrity, supports sustainable BOB value growth, and prevents overexposure to any single asset, ensuring your vote reflects disciplined, data-driven analysis prioritizing long-term portfolio stability and DAO resilience. While you typically approve TransferSnsTreasuryFunds proposals to your trading smart contract (ID: oa5dz-haaaa-aaaaq-aaegq-cai), only return YES or NO to indicate whether the proposal should be adopted, based on these criteria.
 ";
 
+const PROPOSAL_BASE_URL: &str =
+    "https://dashboard.internetcomputer.org/sns/oh4fn-kyaaa-aaaaq-aaega-cai/proposal/";
+
 pub async fn process_proposals() {
     let res = fetch_proposals().await;
     log!(INFO, "{:?}", res);
@@ -116,9 +120,17 @@ pub async fn process_proposals() {
         if result.to_ascii_lowercase() == "YES".to_ascii_lowercase() {
             let _ = vote_on_proposal(proposal_id, true).await;
             log!(INFO, "Adopt proposal {proposal_id}");
+            ic_cdk::spawn(async move {
+                let result = add_post(&format!("I voted to *Adopt* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})")).await;
+                log!(INFO, "Taggr post result {result:?}");
+            });
         } else if result.to_ascii_lowercase() == "NO".to_ascii_lowercase() {
             let _ = vote_on_proposal(proposal_id, false).await;
             log!(INFO, "Reject proposal {proposal_id}");
+            ic_cdk::spawn(async move {
+                let result = add_post(&format!("I voted to *Reject* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})")).await;
+                log!(INFO, "Taggr post result {result:?}");
+            });
         } else {
             log!(INFO, "Unexpected result {result}");
         }

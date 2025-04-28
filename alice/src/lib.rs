@@ -7,6 +7,7 @@ use crate::ledger::{approve, balance_of};
 use crate::logs::{DEBUG, INFO};
 use crate::memory::{next_action, pop_front_action, push_action, push_actions, push_trade_action};
 use crate::state::{mutate_state, read_state, Quote};
+use crate::taggr::add_post;
 use crate::tasks::{schedule_after, schedule_now, TaskType};
 use candid::{CandidType, Deserialize, Nat, Principal};
 use futures::future::join_all;
@@ -26,6 +27,7 @@ pub mod llm;
 pub mod logs;
 pub mod memory;
 pub mod state;
+pub mod taggr;
 pub mod tasks;
 
 // Custom SNS function to launch a token on https://launch.bob.fun.
@@ -410,6 +412,15 @@ async fn execute_action(action: Action) -> Result<(), String> {
                         pool_id,
                         token: to,
                         amount: out_amount,
+                    });
+                    ic_cdk::spawn(async move {
+                        let result = add_post(&format!(
+                            "I just swapped {} {from} for {} {to} on ICPSwap 🚀",
+                            DisplayAmount(amount),
+                            DisplayAmount(out_amount)
+                        ))
+                        .await;
+                        log!(INFO, "Taggr post result {result:?}");
                     });
                     Ok(())
                 }
