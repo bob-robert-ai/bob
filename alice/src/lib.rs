@@ -700,6 +700,32 @@ pub fn timer() {
                     fetch_quotes().await;
                 });
             }
+            TaskType::RefreshStake => {
+                ic_cdk::spawn(async move {
+                    let _guard = match TaskGuard::new(task_type) {
+                        Ok(guard) => guard,
+                        Err(_) => return,
+                    };
+
+                    if let Ok(balance) = balance_of(
+                        ic_cdk::id(),
+                        Principal::from_text("oj6if-riaaa-aaaaq-aaeha-cai").unwrap(),
+                    )
+                    .await
+                    {
+                        if balance > 100 * 100_000_000 {
+                            let result = crate::ledger::stake_alice(
+                                balance.saturating_sub(100 * 100_000_000),
+                            )
+                            .await;
+                            log!(INFO, "[RefreshStake] {result:?}");
+                            let result = crate::governance::refresh_sns_neuron().await;
+                            log!(INFO, "[RefreshStake] {result:?}");
+                        }
+                    }
+                    schedule_after(Duration::from_secs(24 * 60 * 60), TaskType::RefreshStake);
+                });
+            }
             TaskType::RefreshMinerBurnRate => {
                 ic_cdk::spawn(async move {
                     let _guard = match TaskGuard::new(task_type) {

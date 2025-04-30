@@ -7,6 +7,7 @@ edition = "2021"
 candid = { workspace = true }
 ciborium = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 ic0 = { workspace = true }
 ic-base-types = { workspace = true }
 ic-canister-log = { workspace = true }

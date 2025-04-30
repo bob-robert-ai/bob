@@ -36,6 +36,7 @@ fn setup_timer() {
     schedule_now(TaskType::FetchQuotes);
     schedule_now(TaskType::RefreshMinerBurnRate);
     schedule_now(TaskType::TryVoteOnProposal);
+    schedule_now(TaskType::RefreshStake);
 }
 
 #[export_name = "canister_global_timer"]

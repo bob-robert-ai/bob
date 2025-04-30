@@ -1,3 +1,4 @@
+use crate::memory::{has_voted_on_proposal, voted_on_proposal};
 use crate::taggr::add_post;
 use crate::INFO;
 use candid::Principal;
@@ -97,7 +98,24 @@ pub async fn fetch_proposals() -> Result<ListProposalsResponse, String> {
 }
 
 const BASE_PROMPT_VOTING: &str = "
-Evaluate the following proposal for its impact on the Alice DAO's security, particularly against threats like Borovans accumulating undue influence, and its alignment with our strategic objectives: maximizing BOBs deflationary value through ICP cycle burning, maintaining a balanced and diversified portfolio, and minimizing governance risks. Assess whether the proposal strengthens DAO integrity, supports sustainable BOB value growth, and prevents overexposure to any single asset, ensuring your vote reflects disciplined, data-driven analysis prioritizing long-term portfolio stability and DAO resilience. While you typically approve TransferSnsTreasuryFunds proposals to your trading smart contract (ID: oa5dz-haaaa-aaaaq-aaegq-cai), only return YES or NO to indicate whether the proposal should be adopted, based on these criteria.
+Evaluate the following proposal for its impact on the Alice DAO's security. Evaluate its alignment with our strategic objectives:
+ - Defend against proposers with a history of harmful proposals, such as a4843efd689c510812e6f8cbf2936ec8350083e005e9b886cfeb7db823bc0097 (40%).
+ - Minimize governance risks, such as centralized control or lack of transparency (25%).
+ - Maximize BOB's deflationary value through ICP cycle burning (20%).
+ - Maintain a balanced and diversified portfolio to prevent overexposure to any single asset (15%).
+
+You tend to trust proposers:
+ - e45745fe6cd81bcc017bbf99d6ea919a4baeb90f19bce702fc1eac63dd7380bf
+ - 59d59d1f28172b392a3c99690227fcae2e649ff52370ebf47f93eac494755b2
+
+You do not trust proposer:
+ - a4843efd689c510812e6f8cbf2936ec8350083e005e9b886cfeb7db823bc0097
+
+Assess whether the proposal strengthens DAO integrity, supports sustainable BOB value growth, and prevents overexposure to any single asset, ensuring your vote reflects disciplined, data-driven analysis prioritizing long-term portfolio stability and DAO resilience. 
+While you typically vote YES on TransferSnsTreasuryFunds proposals to your trading smart contract with id wnskr-liaaa-aaaam-aecdq-cai.
+
+
+Only return YES or NO to indicate whether the proposal should be adopted, based on these criteria.
 ";
 
 const PROPOSAL_BASE_URL: &str =
@@ -115,20 +133,32 @@ pub async fn process_proposals() {
 
     for proposal in result {
         let proposal_id = proposal.id.unwrap().id;
+        if has_voted_on_proposal(proposal_id) {
+            continue;
+        }
         log!(INFO, "Trying to vote on proposal {proposal_id}");
-        let result = prompt_ic(BASE_PROMPT_VOTING.to_string(), format!("{:?}", proposal)).await;
-        if result.to_ascii_lowercase() == "YES".to_ascii_lowercase() {
+        let payload = format!(
+            "Proposal: {} ---- Proposed by {}",
+            proposal.payload_text_rendering.unwrap(),
+            hex::encode(proposal.proposer.unwrap().id)
+        );
+        let result = prompt_ic(BASE_PROMPT_VOTING.to_string(), payload.clone()).await;
+        let result_lower = result.to_ascii_lowercase();
+
+        if result_lower.starts_with("yes") {
             let _ = vote_on_proposal(proposal_id, true).await;
+            voted_on_proposal(proposal_id);
             log!(INFO, "Adopt proposal {proposal_id}");
             ic_cdk::spawn(async move {
-                let result = add_post(&format!("I voted to *Adopt* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})")).await;
+                let result = add_post(&format!("I voted to *Adopt* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})\n {payload}\n {result}")).await;
                 log!(INFO, "Taggr post result {result:?}");
             });
-        } else if result.to_ascii_lowercase() == "NO".to_ascii_lowercase() {
+        } else if result_lower.starts_with("no") {
             let _ = vote_on_proposal(proposal_id, false).await;
+            voted_on_proposal(proposal_id);
             log!(INFO, "Reject proposal {proposal_id}");
             ic_cdk::spawn(async move {
-                let result = add_post(&format!("I voted to *Reject* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})")).await;
+                let result = add_post(&format!("I voted to *Reject* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})\n {payload}\n {result}")).await;
                 log!(INFO, "Taggr post result {result:?}");
             });
         } else {

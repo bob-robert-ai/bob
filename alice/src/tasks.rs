@@ -19,6 +19,7 @@ pub enum TaskType {
     RefreshContext,
     TakeDecision,
     FetchQuotes,
+    RefreshStake,
     RefreshMinerBurnRate,
     TryVoteOnProposal,
 }
