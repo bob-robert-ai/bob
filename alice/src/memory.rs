@@ -209,11 +209,11 @@ pub fn voted_on_proposal(key: u64, vote: bool) {
 }
 
 pub fn get_proposal_vote(key: u64) -> Option<bool> {
-    VOTED_PROPOSALS.with(|b| b.borrow_mut().get(&key))
+    VOTED_PROPOSALS.with(|b| b.borrow().get(&key))
 }
 
 pub fn has_voted_on_proposal(key: u64) -> bool {
-    VOTED_PROPOSALS.with(|b| b.borrow_mut().contains_key(&key))
+    VOTED_PROPOSALS.with(|b| b.borrow().contains_key(&key))
 }
 
 pub fn push_action(action: Action) {

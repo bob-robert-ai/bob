@@ -3,7 +3,10 @@ use crate::taggr::add_post;
 use crate::INFO;
 use candid::Principal;
 use ic_canister_log::log;
-use ic_sns_governance::pb::v1::{ListProposals, ListProposalsResponse, ProposalRewardStatus};
+use ic_sns_governance::pb::v1::{
+    GetProposal, GetProposalResponse, ListProposals, ListProposalsResponse, ProposalData,
+    ProposalRewardStatus,
+};
 
 pub async fn refresh_sns_neuron() -> Result<ManageSnsNeuronResponse, String> {
     use ic_sns_governance::pb::v1::manage_neuron::claim_or_refresh::{By, MemoAndController};
@@ -97,6 +100,30 @@ pub async fn fetch_proposals() -> Result<ListProposalsResponse, String> {
     }
 }
 
+pub async fn get_proposal(proposal_id: u64) -> Result<ProposalData, String> {
+    let alice_governance_id = Principal::from_text("oa5dz-haaaa-aaaaq-aaegq-cai").unwrap();
+
+    let arg = GetProposal {
+        proposal_id: Some(ic_sns_governance::pb::v1::ProposalId { id: proposal_id }),
+    };
+    let res_gov: Result<(GetProposalResponse,), (i32, String)> =
+        ic_cdk::api::call::call(alice_governance_id, "get_proposal", (arg,))
+            .await
+            .map_err(|(code, msg)| (code as i32, msg));
+    match res_gov {
+        Ok((res,)) => match res.result.unwrap() {
+            ic_sns_governance::pb::v1::get_proposal_response::Result::Proposal(data) => Ok(data),
+            ic_sns_governance::pb::v1::get_proposal_response::Result::Error(error) => {
+                Err(format!("{error:?}"))
+            }
+        },
+        Err((code, msg)) => Err(format!(
+            "Error while calling Governance canister ({}): {:?}",
+            code, msg
+        )),
+    }
+}
+
 const BASE_PROMPT_VOTING: &str = "
 Evaluate the following proposal for its impact on the Alice DAO's security. Evaluate its alignment with our strategic objectives:
  - Defend against proposers with a history of harmful proposals, such as a4843efd689c510812e6f8cbf2936ec8350083e005e9b886cfeb7db823bc0097 (40%).
@@ -121,16 +148,8 @@ Only return YES or NO to indicate whether the proposal should be adopted, based 
 const PROPOSAL_BASE_URL: &str =
     "https://dashboard.internetcomputer.org/sns/oh4fn-kyaaa-aaaaq-aaega-cai/proposal/";
 
-pub async fn process_proposals() {
-    let res = fetch_proposals().await;
-    log!(INFO, "{:?}", res);
-
-    let result = if let Ok(result) = res {
-        result.proposals
-    } else {
-        vec![]
-    };
-
+pub async fn process_proposals() -> Result<(), String> {
+    let result = fetch_proposals().await?.proposals;
     log!(INFO, "Fetched {} proposals.", result.len());
 
     for proposal in result {
@@ -168,4 +187,6 @@ pub async fn process_proposals() {
             log!(INFO, "Unexpected result {result}");
         }
     }
+
+    Ok(())
 }

@@ -748,10 +748,13 @@ pub fn timer() {
                     };
 
                     let _enqueue_followup_guard = scopeguard::guard((), |_| {
-                        schedule_after(Duration::from_secs(5), TaskType::TryVoteOnProposal);
+                        schedule_after(Duration::from_secs(30), TaskType::TryVoteOnProposal);
                     });
 
-                    crate::governance::process_proposals().await;
+                    if let Err(e) = crate::governance::process_proposals().await {
+                        schedule_after(Duration::from_secs(30), TaskType::TryVoteOnProposal);
+                        log!(INFO, "[TryVoteOnProposal] failed with error: {e}");
+                    }
                     schedule_after(
                         Duration::from_secs(12 * 60 * 60),
                         TaskType::TryVoteOnProposal,

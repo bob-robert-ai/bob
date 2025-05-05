@@ -1,3 +1,4 @@
+use alice::logs::INFO;
 use alice::state::{read_state, replace_state, State};
 use alice::tasks::{schedule_after, schedule_now, TaskType};
 use alice::{
@@ -5,6 +6,7 @@ use alice::{
     TRIGGER_TOKEN_CREATION_FUNCTION_ID,
 };
 use candid::{Encode, Principal};
+use ic_canister_log::log;
 use ic_canisters_http_types::{HttpRequest, HttpResponse, HttpResponseBuilder};
 use ic_sns_governance::pb::v1::{
     self, proposal::Action, ExecuteGenericNervousSystemFunction, GovernanceError, ManageNeuron,
@@ -125,6 +127,29 @@ fn get_alice_portfolio() -> Vec<Asset> {
             })
             .collect()
     })
+}
+
+#[update(hidden = true)]
+async fn process_proposals() -> Result<(), String> {
+    alice::governance::process_proposals().await
+}
+
+#[update(hidden = true)]
+async fn process_treasury_proposals(proposal_id: u64) -> Result<(), String> {
+    let result = alice::governance::get_proposal(proposal_id).await?;
+    if let ic_sns_governance::pb::v1::proposal::Action::TransferSnsTreasuryFunds(treasury_action) =
+        result.proposal.unwrap().action.unwrap()
+    {
+        if treasury_action.from_treasury == 1
+            && treasury_action.to_principal.unwrap().0
+                == Principal::from_text("wnskr-liaaa-aaaam-aecdq-cai").unwrap()
+        {
+            let result = alice::governance::vote_on_proposal(proposal_id, true).await?;
+            log!(INFO, "{result:?}");
+        }
+    }
+
+    Ok(())
 }
 
 #[update(hidden = true)]
