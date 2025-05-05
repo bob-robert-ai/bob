@@ -747,6 +747,10 @@ pub fn timer() {
                         Err(_) => return,
                     };
 
+                    let _enqueue_followup_guard = scopeguard::guard((), |_| {
+                        schedule_after(Duration::from_secs(5), TaskType::TryVoteOnProposal);
+                    });
+
                     crate::governance::process_proposals().await;
                     schedule_after(
                         Duration::from_secs(12 * 60 * 60),

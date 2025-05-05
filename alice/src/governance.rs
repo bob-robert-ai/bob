@@ -125,15 +125,18 @@ pub async fn process_proposals() {
     let res = fetch_proposals().await;
     log!(INFO, "{:?}", res);
 
-    let result = if let Ok(result) = fetch_proposals().await {
+    let result = if let Ok(result) = res {
         result.proposals
     } else {
         vec![]
     };
 
+    log!(INFO, "Fetched {} proposals.", result.len());
+
     for proposal in result {
         let proposal_id = proposal.id.unwrap().id;
         if has_voted_on_proposal(proposal_id) {
+            log!(INFO, "Already voted on proposal.");
             continue;
         }
         log!(INFO, "Trying to vote on proposal {proposal_id}");
@@ -147,7 +150,7 @@ pub async fn process_proposals() {
 
         if result_lower.starts_with("yes") {
             let _ = vote_on_proposal(proposal_id, true).await;
-            voted_on_proposal(proposal_id);
+            voted_on_proposal(proposal_id, true);
             log!(INFO, "Adopt proposal {proposal_id}");
             ic_cdk::spawn(async move {
                 let result = add_post(&format!("I voted to *Adopt* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})\n {payload}\n {result}")).await;
@@ -155,7 +158,7 @@ pub async fn process_proposals() {
             });
         } else if result_lower.starts_with("no") {
             let _ = vote_on_proposal(proposal_id, false).await;
-            voted_on_proposal(proposal_id);
+            voted_on_proposal(proposal_id, false);
             log!(INFO, "Reject proposal {proposal_id}");
             ic_cdk::spawn(async move {
                 let result = add_post(&format!("I voted to *Reject* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})\n {payload}\n {result}")).await;

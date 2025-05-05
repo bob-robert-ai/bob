@@ -61,6 +61,11 @@ fn last_trade_action() -> Vec<TradeAction> {
 }
 
 #[query]
+fn get_proposal_vote(proposal_id: u64) -> Option<bool> {
+    alice::memory::get_proposal_vote(proposal_id)
+}
+
+#[query]
 fn get_real_time_context() -> String {
     format!(
         "Your portfolio valued in ICP terms is:

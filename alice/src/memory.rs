@@ -57,7 +57,7 @@ const TRADE_HISTORY_INDX_MEM_ID: MemoryId = MemoryId::new(2);
 const TRADE_HISTORY_DATA_MEM_ID: MemoryId = MemoryId::new(3);
 const XAI_API_KEY_ID: MemoryId = MemoryId::new(4);
 const QUOTES_MEM_ID: MemoryId = MemoryId::new(5);
-const VOTED_PROPOSALS_ID: MemoryId = MemoryId::new(6);
+const VOTED_PROPOSALS_ID: MemoryId = MemoryId::new(10);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -93,7 +93,7 @@ thread_local! {
             ))
         });
 
-    static VOTED_PROPOSALS: RefCell<StableBTreeMap<u64, (), VM>> =
+    static VOTED_PROPOSALS: RefCell<StableBTreeMap<u64, bool, VM>> =
         MEMORY_MANAGER.with(|mm| {
             RefCell::new(StableBTreeMap::new(
                 mm.borrow().get(VOTED_PROPOSALS_ID)
@@ -202,10 +202,14 @@ pub fn get_api_key() -> Option<String> {
     XAI_API_KEY.with(|b| b.borrow().get().clone())
 }
 
-pub fn voted_on_proposal(key: u64) {
+pub fn voted_on_proposal(key: u64, vote: bool) {
     VOTED_PROPOSALS.with(|b| {
-        b.borrow_mut().insert(key, ()).unwrap();
+        b.borrow_mut().insert(key, vote).unwrap();
     });
+}
+
+pub fn get_proposal_vote(key: u64) -> Option<bool> {
+    VOTED_PROPOSALS.with(|b| b.borrow_mut().get(&key))
 }
 
 pub fn has_voted_on_proposal(key: u64) -> bool {

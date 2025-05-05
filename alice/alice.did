@@ -7,6 +7,7 @@ type TradeAction = variant {
 service : () -> {
   get_alice_portfolio : () -> (vec Asset) query;
   get_all_prices : () -> (text) query;
+  get_proposal_vote : (nat64) -> (opt bool) query;
   get_balances : () -> (vec record { Token; nat64 }) query;
   get_miner : () -> (opt principal) query;
   get_real_time_context : () -> (text) query;
