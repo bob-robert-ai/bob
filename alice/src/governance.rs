@@ -1,5 +1,6 @@
 use crate::memory::{has_voted_on_proposal, voted_on_proposal};
 use crate::taggr::add_post;
+use crate::DisplayAmount;
 use crate::INFO;
 use candid::Principal;
 use ic_canister_log::log;
@@ -148,6 +149,105 @@ Only return YES or NO to indicate whether the proposal should be adopted, based 
 const PROPOSAL_BASE_URL: &str =
     "https://dashboard.internetcomputer.org/sns/oh4fn-kyaaa-aaaaq-aaega-cai/proposal/";
 
+fn action_to_string(value: u64) -> String {
+    match value {
+        0 => "Unspecified".to_string(),
+        1 => "Motion".to_string(),
+        2 => "ManageNervousSystemParameters".to_string(),
+        3 => "UpgradeSnsControlledCanister".to_string(),
+        4 => "AddGenericNervousSystemFunction".to_string(),
+        5 => "RemoveGenericNervousSystemFunction".to_string(),
+        6 => "ExecuteGenericNervousSystemFunction".to_string(),
+        7 => "UpgradeSnsToNextVersion".to_string(),
+        8 => "ManageSnsMetadata".to_string(),
+        9 => "TransferSnsTreasuryFunds".to_string(),
+        13 => "ManageLedgerParameters".to_string(),
+        14 => "ManageDappCanisterSettings".to_string(),
+        15 => "AdvanceSnsTargetVersion".to_string(),
+        _other => "Unknown(other)".to_string(),
+    }
+}
+
+fn to_known_canister(to_principal: Principal) -> String {
+    let mut result = "Unknown Destination".to_string();
+    if to_principal == Principal::from_text("oa5dz-haaaa-aaaaq-aaegq-cai").unwrap() {
+        result = "Alice Governance Canister".to_string();
+    }
+    if to_principal == Principal::from_text("wnskr-liaaa-aaaam-aecdq-cai").unwrap() {
+        result = "Alice Trading Agent".to_string();
+    }
+    result
+}
+
+fn display_from_treasury(from: i32) -> String {
+    if from == 1_i32 {
+        return "ICP".to_string();
+    }
+    "ALICE".to_string()
+}
+
+use ic_sns_governance::pb::v1::proposal::Action;
+
+fn display_action(action: Action) -> String {
+    match action {
+        Action::Unspecified(_) => "Unspecified action".to_string(),
+        Action::Motion(motion) => {
+            format!("Motion: {:?}", motion)
+        }
+        Action::ManageNervousSystemParameters(params) => {
+            format!("Managing Nervous System Parameters: {:?}", params)
+        }
+        Action::UpgradeSnsControlledCanister(upgrade) => {
+            format!("Upgrading SNS Controlled Canister: {:?}", upgrade)
+        }
+        Action::AddGenericNervousSystemFunction(func) => {
+            format!("Adding Generic Nervous System Function: {:?}", func)
+        }
+        Action::RemoveGenericNervousSystemFunction(id) => {
+            format!("Removing Generic Nervous System Function with ID: {}", id)
+        }
+        Action::ExecuteGenericNervousSystemFunction(exec) => {
+            format!("Executing Generic Nervous System Function: {:?}", exec)
+        }
+        Action::UpgradeSnsToNextVersion(upgrade) => {
+            format!("Upgrading SNS to Next Version: {:?}", upgrade)
+        }
+        Action::ManageSnsMetadata(metadata) => {
+            format!("Managing SNS Metadata: {:?}", metadata)
+        }
+        Action::TransferSnsTreasuryFunds(transfer) => {
+            format!(
+                "Transferring Treasury Funds {} {} tokens to {}",
+                DisplayAmount(transfer.amount_e8s),
+                display_from_treasury(transfer.from_treasury),
+                to_known_canister(transfer.to_principal.unwrap().0)
+            )
+        }
+        Action::RegisterDappCanisters(reg) => {
+            format!("Registering Dapp Canisters: {:?}", reg)
+        }
+        Action::DeregisterDappCanisters(dereg) => {
+            format!("Deregistering Dapp Canisters: {:?}", dereg)
+        }
+        Action::MintSnsTokens(mint) => {
+            format!(
+                "Minting {} ALICE tokens to {}",
+                DisplayAmount(mint.amount_e8s()),
+                to_known_canister(mint.to_principal.unwrap().0)
+            )
+        }
+        Action::ManageLedgerParameters(params) => {
+            format!("Managing Ledger Parameters: {:?}", params)
+        }
+        Action::ManageDappCanisterSettings(settings) => {
+            format!("Managing Dapp Canister Settings: {:?}", settings)
+        }
+        Action::AdvanceSnsTargetVersion(version) => {
+            format!("Advancing SNS Target Version: {:?}", version)
+        }
+    }
+}
+
 pub async fn process_proposals() -> Result<(), String> {
     let result = fetch_proposals().await?.proposals;
     log!(INFO, "Fetched {} proposals.", result.len());
@@ -160,8 +260,12 @@ pub async fn process_proposals() -> Result<(), String> {
         }
         log!(INFO, "Trying to vote on proposal {proposal_id}");
         let payload = format!(
-            "Proposal: {} ---- Proposed by {}",
-            proposal.payload_text_rendering.unwrap(),
+            "# {} Proposal  
+            ## Proposed by {}
+            ## {}
+            ",
+            action_to_string(proposal.action),
+            display_action(proposal.proposal.unwrap().action.unwrap()),
             hex::encode(proposal.proposer.unwrap().id)
         );
         let result = prompt_ic(BASE_PROMPT_VOTING.to_string(), payload.clone()).await;
