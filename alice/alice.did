@@ -3,6 +3,7 @@ type Token = variant { Bob; Icp; Alice };
 type TradeAction = variant {
   Buy : record { ts : nat64; token : Token; amount : nat64 };
   Sell : record { ts : nat64; token : Token; amount : nat64 };
+  Bait : record { ts : nat64; token : Token; amount : nat64 };
 };
 service : () -> {
   get_alice_portfolio : () -> (vec Asset) query;

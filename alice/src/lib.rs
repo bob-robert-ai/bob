@@ -187,7 +187,13 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
         "icp" => Token::Icp,
         "alice" => Token::Alice,
         "bob" => Token::Bob,
-        _ => return Err("Unknown token".to_string()),
+        _ => {
+            return Ok(TradeAction::Bait {
+                token: Token::Icp,
+                amount: read_state(|s| s.amount_to_buy(Token::Icp)),
+                ts: timestamp_nanos(),
+            })
+        }
     };
 
     if token == Token::Icp {
@@ -197,7 +203,13 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
     let mut amount_to_trade = match action.as_str() {
         "buy" => read_state(|s| s.amount_to_buy(token)),
         "sell" => read_state(|s| *s.balances.get(&token).unwrap_or(&0)) / 10,
-        _ => return Err("Unknown action".to_string()),
+        _ => {
+            return Ok(TradeAction::Bait {
+                token: Token::Icp,
+                amount: read_state(|s| s.amount_to_buy(Token::Icp)),
+                ts: timestamp_nanos(),
+            })
+        }
     };
 
     amount_to_trade = amount_to_trade.max(token.minimum_amount_to_trade());
@@ -213,7 +225,11 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
             amount: amount_to_trade,
             ts: timestamp_nanos(),
         }),
-        _ => Err("Unknown action".to_string()),
+        _ => Ok(TradeAction::Bait {
+            token,
+            amount: amount_to_trade,
+            ts: timestamp_nanos(),
+        }),
     }
 }
 
@@ -221,6 +237,7 @@ pub fn parse_trade_action(input: &str) -> Result<TradeAction, String> {
 pub enum TradeAction {
     Buy { token: Token, amount: u64, ts: u64 },
     Sell { token: Token, amount: u64, ts: u64 },
+    Bait { token: Token, amount: u64, ts: u64 },
 }
 
 impl TradeAction {
@@ -276,6 +293,29 @@ impl TradeAction {
                     },
                 ]
             }
+            TradeAction::Bait {
+                token,
+                amount,
+                ts: _,
+            } => {
+                vec![
+                    Action::Icrc2Approve {
+                        pool_id: token.pool_id(),
+                        amount: *amount,
+                        token: *token,
+                    },
+                    Action::DepositFrom {
+                        pool_id: token.pool_id(),
+                        ledger_id: token.ledger_id(),
+                        amount: *amount,
+                    },
+                    Action::Withdraw {
+                        pool_id: token.pool_id(),
+                        token: *token,
+                        amount: *amount,
+                    },
+                ]
+            }
         }
     }
 
@@ -299,6 +339,7 @@ impl TradeAction {
                 Token::Bob => true,
                 Token::Alice => true,
             },
+            TradeAction::Bait { .. } => unreachable!(),
         }
     }
 }
@@ -674,10 +715,16 @@ pub fn timer() {
 
                     match process_logic().await {
                         Ok(true) => {
-                            schedule_after(Duration::from_secs(240), TaskType::ProcessLogic);
+                            schedule_after(
+                                Duration::from_secs(30 + ic_cdk::api::time() % 240),
+                                TaskType::ProcessLogic,
+                            );
                         }
                         Ok(false) => {
-                            schedule_after(Duration::from_secs(440), TaskType::ProcessLogic);
+                            schedule_after(
+                                Duration::from_secs(30 + ic_cdk::api::time() % 440),
+                                TaskType::ProcessLogic,
+                            );
                         }
                         Err(e) => {
                             log!(INFO, "[ProcessLogic] Failed to process logic: {e}");

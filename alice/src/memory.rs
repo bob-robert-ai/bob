@@ -160,9 +160,9 @@ pub fn push_trade_action(trade_action: TradeAction) {
 }
 
 pub fn get_trade_action(index: u64) -> Option<TradeAction> {
-    // never return the latest trade
+    // never return the latest 5 trades
     TRADE_HISTORY.with(|s| {
-        if index < s.borrow().len().saturating_sub(1) {
+        if index < s.borrow().len().saturating_sub(5) {
             return s.borrow().get(index).map(|b| b.0);
         }
         None
@@ -172,7 +172,7 @@ pub fn get_trade_action(index: u64) -> Option<TradeAction> {
 pub fn last_trade_action(length: u64) -> Vec<TradeAction> {
     TRADE_HISTORY.with(|s| {
         let start = s.borrow().len().saturating_sub(length);
-        let end = s.borrow().len();
+        let end = s.borrow().len().saturating_sub(5);
         let mut result: Vec<TradeAction> = vec![];
         for index in start..end {
             result.push(s.borrow().get(index).map(|b| b.0).unwrap().clone());
