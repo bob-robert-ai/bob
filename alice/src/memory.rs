@@ -204,7 +204,7 @@ pub fn get_api_key() -> Option<String> {
 
 pub fn voted_on_proposal(key: u64, vote: bool) {
     VOTED_PROPOSALS.with(|b| {
-        b.borrow_mut().insert(key, vote).unwrap();
+        assert!(b.borrow_mut().insert(key, vote).is_none());
     });
 }
 

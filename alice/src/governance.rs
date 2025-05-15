@@ -265,12 +265,12 @@ pub async fn process_proposals() -> Result<(), String> {
             ## {}
             ",
             action_to_string(proposal.action),
+            hex::encode(proposal.proposer.unwrap().id),
             display_action(proposal.proposal.unwrap().action.unwrap()),
-            hex::encode(proposal.proposer.unwrap().id)
         );
         let result = prompt_ic(BASE_PROMPT_VOTING.to_string(), payload.clone()).await;
 
-        if result.contains("\nYES") {
+        if result.contains("\nYES") || result.starts_with("YES") {
             let _ = vote_on_proposal(proposal_id, true).await;
             voted_on_proposal(proposal_id, true);
             log!(INFO, "Adopt proposal {proposal_id}");
@@ -278,7 +278,7 @@ pub async fn process_proposals() -> Result<(), String> {
                 let result = add_post(&format!("I voted to *Adopt* [proposal {proposal_id}]({PROPOSAL_BASE_URL}/{proposal_id})\n {payload}\n {result}")).await;
                 log!(INFO, "Taggr post result {result:?}");
             });
-        } else if result.contains("\nNO") {
+        } else if result.contains("\nNO") || result.starts_with("NO") {
             let _ = vote_on_proposal(proposal_id, false).await;
             voted_on_proposal(proposal_id, false);
             log!(INFO, "Reject proposal {proposal_id}");
