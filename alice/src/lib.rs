@@ -548,8 +548,8 @@ pub fn build_user_prompt() -> String {
     format!(
         "Your portfolio valued in ICP terms is:
         {}
-        You can *only* answer with one of the following: BUY ALICE, SELL BOB, BUY BOB, HODL.
-        What should you do next?
+        You can *only* answer with one of the following: BUY ALICE, BUY BOB, HODL.
+        What should you do next, to accumulate as much BOB as possible and keep control of alice DAO?
         --------------
         {}
         ",

@@ -72,7 +72,7 @@ fn get_real_time_context() -> String {
     format!(
         "Your portfolio valued in ICP terms is:
         {}
-        You can *only* answer with one of the following: BUY ALICE, BUY BOB, SELL BOB, HODL.
+        You can *only* answer with one of the following: BUY ALICE, BUY BOB, HODL.
         What should you do next?
         --------------
         {}
